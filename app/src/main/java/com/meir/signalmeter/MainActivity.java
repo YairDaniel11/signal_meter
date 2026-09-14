@@ -142,9 +142,19 @@ public class MainActivity extends Activity {
 
     /** dBm מדויק זמין רק מ-API 29; לפני כן ממירים מ-ASU (נוסחת GSM סטנדרטית). */
     private Integer extractDbm(SignalStrength signalStrength) {
+        if (signalStrength == null) return null;
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            int dbm = signalStrength.getDbm();
-            return (dbm != Integer.MAX_VALUE) ? dbm : null;
+            try {
+                java.lang.reflect.Method method = SignalStrength.class.getMethod("getDbm");
+                Object result = method.invoke(signalStrength);
+                if (result instanceof Integer) {
+                    int dbm = (Integer) result;
+                    return (dbm != Integer.MAX_VALUE) ? dbm : null;
+                }
+            } catch (Exception ignored) {
+                // במידה והקריאה הדינמית נכשלה, ממשיכים לחישוב מבוסס ASU
+            }
         }
         int asu = signalStrength.getGsmSignalStrength();
         if (asu == 99) return null;
