@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:Theme">
+        <item name="colorBgMain">@color/bg_dark</item>
+        <item name="colorSurface">@color/surface_dark</item>
+        <item name="colorTextPrimary">@color/text_primary_dark</item>
+        <item name="colorTextSecondary">@color/text_secondary_dark</item>
+        <item name="colorAccent">@color/accent_teal</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="AppTheme.Dark" parent="AppTheme" />
+
+    <style name="AppTheme.Light" parent="AppTheme">
+        <item name="colorBgMain">@color/bg_light</item>
+        <item name="colorSurface">@color/surface_light</item>
+        <item name="colorTextPrimary">@color/text_primary_light</item>
+        <item name="colorTextSecondary">@color/text_secondary_light</item>
+    </style>
+</resources>

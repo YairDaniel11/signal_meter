@@ -1,0 +1,31 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.meir.signalmeter'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.meir.signalmeter"
+        minSdk 19       // Android 4.4 KitKat - קבוע, לא משנים אף פעם
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "SignalMeter-${variant.versionName}-${variant.buildType.name}.apk"
+        }
+    }
+}

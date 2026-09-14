@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#121212</color>
+    <color name="surface_dark">#1E1E1E</color>
+    <color name="text_primary_dark">#FFFFFF</color>
+    <color name="text_secondary_dark">#B0B0B0</color>
+
+    <color name="bg_light">#FAFAFA</color>
+    <color name="surface_light">#FFFFFF</color>
+    <color name="text_primary_light">#1A1A1A</color>
+    <color name="text_secondary_light">#5A5A5A</color>
+
+    <color name="accent_teal">#00BFA5</color>
+
+    <!-- צבעי רמת אות - קונקרטיים בכוונה, לא תלויי theme -->
+    <color name="signal_good">#2E7D32</color>
+    <color name="signal_medium">#F9A825</color>
+    <color name="signal_bad">#C62828</color>
+</resources>

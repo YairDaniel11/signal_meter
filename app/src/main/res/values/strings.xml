@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">מד קליטה</string>
+    <string name="dbm_unit">dBm</string>
+    <string name="waiting_for_reading">ממתין לקריאה…</string>
+    <string name="unknown_value">לא ידוע</string>
+    <string name="reset_button">אפס מדידה</string>
+    <string name="permission_needed">נדרשת הרשאה לקריאת מצב הטלפון כדי למדוד קליטה.</string>
+    <string name="grant_permission_button">אשר הרשאה</string>
+    <string name="permission_denied_message">ההרשאה נדחתה. אי אפשר למדוד קליטה בלי הרשאת קריאת מצב הטלפון.</string>
+    <string name="stats_format">מינימום: %1$s   ממוצע: %2$s   מקסימום: %3$s</string>
+    <string name="asu_level_format">ASU: %1$s   רמה: %2$s/4</string>
+    <string name="network_format">רשת: %1$s   מפעיל: %2$s</string>
+    <string name="samples_format">מספר מדידות: %1$d</string>
+</resources>
