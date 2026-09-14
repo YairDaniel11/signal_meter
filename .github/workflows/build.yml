@@ -1,48 +1,115 @@
+# בונה APK אוטומטית על כל push, ומצרף אותו כ-GitHub Release קבוע.
+# הרצה ידנית אפשרית גם מהטאב "Actions" במאגר (workflow_dispatch), בלי push.
+#
+# מספר הגרסה (versionName) מחושב כאן *אוטומטית לגמרי* מתוך מספר הריצה
+# של GitHub Actions (github.run_number) - לא נקרא יותר מ-app/build.gradle
+# ולא דורש שום עריכה ידנית בשום קובץ בשביל להתעדכן.
+
 name: Build APK
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+# GITHUB_TOKEN (ניתן אוטומטית ע"י GitHub לכל הרצה) צריך הרשאת כתיבה כדי
+# שנוכל ליצור Release חדש במאגר בסיום הבנייה.
+permissions:
+  contents: write
 
 jobs:
-  build:
+  assembleDebug:
     runs-on: ubuntu-latest
+
+    # תמונת Docker רשמית של Gradle - כך שאין תלות בגרסת Gradle/JDK שמותקנת
+    # (או לא) מראש על ה-runner של GitHub.
+    container:
+      image: gradle:8.7-jdk17
+
+    env:
+      ANDROID_COMPILE_SDK: "34"
+      ANDROID_BUILD_TOOLS: "34.0.0"
+      ANDROID_CMDLINE_TOOLS_VERSION: "11076708"
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-cache
+      # שם קבוע לקובץ ה-APK/ה-Release, לא תלוי בשפה - האפליקציה עצמה
+      # (ה-label) נשארת בעברית, זה רק שם הקובץ הטכני.
+      APP_FILE_NAME: SignalMeter
+      # ה"1." הזה הוא ה-major version היחיד שנקבע ידנית (רק אם ירצו
+      # לקפוץ יום אחד ל-"2.x" בשינוי גדול) - כל שאר המספר אוטומטי לגמרי.
+      VERSION_MAJOR: "1"
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Cache Gradle
+      # שומר בין ריצות כדי שהורדת Android SDK ותלויות Gradle לא יקרו מאפס בכל push.
+      - name: Cache Android SDK + Gradle
         uses: actions/cache@v4
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: gradle-${{ runner.os }}-
+            ${{ env.ANDROID_SDK_ROOT }}
+            ${{ env.GRADLE_USER_HOME }}
+          key: android-sdk-and-gradle-cache-${{ runner.os }}-v34
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Bump versionCode to run number
+      - name: Install Android SDK
         run: |
-          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" app/build.gradle
+          apt-get update -qq && apt-get install -qq -y wget unzip > /dev/null
+          if [ ! -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ]; then
+            mkdir -p "$ANDROID_SDK_ROOT"
+            wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS_VERSION}_latest.zip" -O /tmp/cmdline-tools.zip
+            unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools-extracted
+            mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+            mv /tmp/cmdline-tools-extracted/cmdline-tools/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
+          fi
+          export PATH="$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools"
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" > /dev/null
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      # גם versionCode וגם versionName מחושבים כאן, ישירות ממספר הריצה -
+      # אין קריאה מ-app/build.gradle ואין עריכה ידנית בשום מקום. הפלט,
+      # לדוגמה בריצה מספר 42: versionCode=42, versionName="1.42".
+      - name: Compute and set version (fully automatic)
+        run: |
+          VERSION_NAME="${VERSION_MAJOR}.${{ github.run_number }}"
+          sed -i "s/versionCode [0-9]\+/versionCode ${{ github.run_number }}/" app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION_NAME}\"/" app/build.gradle
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          grep -E "versionCode|versionName" app/build.gradle
 
+      # minSdk מוגדר בקוד עצמו (app/build.gradle) - ה-CI רק מקמפל, לא משנה את גרסת היעד.
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          export PATH="$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools"
+          gradle assembleDebug --stacktrace --console=plain
 
-      - name: Upload APK
+      # שינוי שם הקובץ מ-"app-debug.apk" הגנרי לשם האמיתי של האפליקציה +
+      # מספר הגרסה - זה מה שהמשתמש מקבל בפועל בהורדה (Artifact/Release).
+      - name: Rename APK to real app name + version
+        run: |
+          mkdir -p renamed-apk
+          FINAL_NAME="${APP_FILE_NAME}-v${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "renamed-apk/${FINAL_NAME}"
+          echo "FINAL_APK_PATH=renamed-apk/${FINAL_NAME}" >> "$GITHUB_ENV"
+          echo "FINAL_APK_NAME=${FINAL_NAME}" >> "$GITHUB_ENV"
+          ls -la renamed-apk/
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signal-meter-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: ${{ env.FINAL_APK_NAME }}
+          path: ${{ env.FINAL_APK_PATH }}
+          retention-days: 30
+
+      # יוצר GitHub Release קבוע בעת push או הרצה ידנית, ומצרף את הקובץ.
+      - name: Create GitHub Release with APK
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION_NAME }}-build${{ github.run_number }}
+          name: "מד עוצמת קליטה v${{ env.VERSION_NAME }}"
+          body: |
+            קובץ ההתקנה: `${{ env.FINAL_APK_NAME }}`
+            גרסה: ${{ env.VERSION_NAME }} (מקומית מ-commit ${{ github.sha }})
+            זו בניית debug לא חתומה (release חתום דורש keystore נפרד) - השם והגרסה בקובץ עדיין אמיתיים, רק סוג הבנייה עצמו לא חתום.
+          files: ${{ env.FINAL_APK_PATH }}
