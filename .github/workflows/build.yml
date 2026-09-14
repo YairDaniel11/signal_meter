@@ -83,13 +83,19 @@ jobs:
           export PATH="$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools"
           gradle assembleDebug --stacktrace --console=plain
 
-      # שינוי שם הקובץ מ-"app-debug.apk" הגנרי לשם האמיתי של האפליקציה +
-      # מספר הגרסה - זה מה שהמשתמש מקבל בפועל בהורדה (Artifact/Release).
+      # שינוי שם הקובץ מ-APK שנוצר לשם האמיתי של האפליקציה +
+      # מספר הגרסה - איתור קובץ ה-APK באופן דינמי בתיקיית הבנייה.
       - name: Rename APK to real app name + version
         run: |
           mkdir -p renamed-apk
           FINAL_NAME="${APP_FILE_NAME}-v${VERSION_NAME}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "renamed-apk/${FINAL_NAME}"
+          FOUND_APK=$(find . -type f -name "*.apk" ! -path "*/renamed-apk/*" | head -n 1)
+          if [ -z "$FOUND_APK" ]; then
+            echo "Error: No APK file found in build output!"
+            exit 1
+          fi
+          echo "Found APK at: $FOUND_APK"
+          cp "$FOUND_APK" "renamed-apk/${FINAL_NAME}"
           echo "FINAL_APK_PATH=renamed-apk/${FINAL_NAME}" >> "$GITHUB_ENV"
           echo "FINAL_APK_NAME=${FINAL_NAME}" >> "$GITHUB_ENV"
           ls -la renamed-apk/
